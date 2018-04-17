@@ -22,6 +22,9 @@ from torchvision.transforms import Compose, CenterCrop, ToTensor, ToPILImage
 
 from PIL import Image
 
+def map01(mat):
+    return (mat - mat.min())/(mat.max() - mat.min())
+
 def load_model(data, model_path, cuda = True):
 
     if cuda and not torch.cuda.is_available():
@@ -61,7 +64,33 @@ def TestOnDataset(image_dir, save_dir, model_path, cuda = True):
     filepath = image_dir
     savepath = save_dir
 
-    ori_img = Image.open(filepath).convert('L')
+    file_name = filepath.split('/')[-1]
+    suffix = '.' + file_name.split('.')[-1]
+    if suffix == '.ser':
+        import serReader
+        ser_data = serReader.serReader(filepath)
+        ser_array = np.array(ser_data['imageData'],dtype = 'float64')
+        ser_array = (map01(ser_array)*255).astype('uint8')
+        ori_img = Image.fromarray(ser_array,'L')
+        savepath = savepath.replace('.ser','.png')
+    else:
+        if suffix == '.dm3':
+            import dm3_lib as dm3
+            data = dm3.DM3(filepath).imagedata
+            data = np.array(data, dtype = 'float64')
+            data = (map01(data) * 255).astype('uint8')
+            ori_img = Image.fromarray(data, mode = 'L')
+            savepath = savepath.replace('.dm3','.png')
+        else:
+            if suffix == '.tif':
+                im = Image.open(filepath).convert('L')
+                imarray_original = np.array(im, dtype = 'float64')
+
+                ori_img = Image.fromarray((map01(imarray_original) * 255).astype('uint8'), mode = 'L')
+                savepath = savepath.replace('.tif','.png')
+            else:
+                ori_img = Image.open(filepath).convert('L')
+    #ori_img = Image.open(filepath).convert('L')
 
     width, height = ori_img.size
     overlap = 2 # if an image is larger than 1024x1024, then the image will be cut to 4 parts.
@@ -175,10 +204,10 @@ def TestOnDataset(image_dir, save_dir, model_path, cuda = True):
     cat_image.save(savepath)
 
 # image directory
-dir = "D:/GMS/Documents/BNL/load_model_code/"
+dir = "D:/GMS/Documents/BNL/load_model_code/test/"
 
 # saving directory
-save_dir = "D:/GMS/Documents/BNL/load_model_code/test/"
+save_dir = "D:/GMS/Documents/BNL/load_model_code/test/results/"
 
 # model path
 model_out_path = "D:/GMS/Documents/BNL/20180208/lr001_weightdecay00001.pth"
@@ -187,7 +216,7 @@ count = 1;
 
 for root, dirs, files in os.walk(dir): #
     for filename in files:
-        if filename.endswith(('.png','.tif','.jpg')): # supported formats of the images
+        if filename.endswith(('.png','.tif','.jpg','.ser','.dm3')): # supported formats of the images
 
             image_name = filename
             filepath = os.path.join(root, image_name)
